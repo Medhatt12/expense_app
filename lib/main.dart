@@ -21,29 +21,29 @@ void main() {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return 
-    // Platform.isIOS ? CupertinoApp(
-    //   title: 'Personal Expenses',
-    //   debugShowCheckedModeBanner: false,
-    //   theme: CupertinoThemeData( 
-    //       primarySwatch: Colors.purple,
-    //       accentColor: Colors.amber,
-    //       fontFamily: 'Quicksand',
-    //       textTheme: ThemeData.light().textTheme.copyWith(
-    //           title: TextStyle(
-    //               fontFamily: 'OpenSans',
-    //               fontSize: 18,
-    //               fontWeight: FontWeight.bold),
-    //           button: TextStyle(color: Colors.white)),
-    //       appBarTheme: AppBarTheme(
-    //           textTheme: ThemeData.light().textTheme.copyWith(
-    //               title: TextStyle(
-    //                   fontFamily: 'OpenSans',
-    //                   fontSize: 20,
-    //                   fontWeight: FontWeight.bold)))),
-    //   home: MyHomePage(),
-    // ): 
-     MaterialApp(
+    return
+        // Platform.isIOS ? CupertinoApp(
+        //   title: 'Personal Expenses',
+        //   debugShowCheckedModeBanner: false,
+        //   theme: CupertinoThemeData(
+        //       primarySwatch: Colors.purple,
+        //       accentColor: Colors.amber,
+        //       fontFamily: 'Quicksand',
+        //       textTheme: ThemeData.light().textTheme.copyWith(
+        //           title: TextStyle(
+        //               fontFamily: 'OpenSans',
+        //               fontSize: 18,
+        //               fontWeight: FontWeight.bold),
+        //           button: TextStyle(color: Colors.white)),
+        //       appBarTheme: AppBarTheme(
+        //           textTheme: ThemeData.light().textTheme.copyWith(
+        //               title: TextStyle(
+        //                   fontFamily: 'OpenSans',
+        //                   fontSize: 20,
+        //                   fontWeight: FontWeight.bold)))),
+        //   home: MyHomePage(),
+        // ):
+        MaterialApp(
       title: 'Personal Expenses',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -72,7 +72,7 @@ class MyHomePage extends StatefulWidget {
   _MyHomePageState createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   final List<Transaction> _userTransactions = [
     // Transaction(
     //     id: 't1', title: 'New Shoes', amount: 69.99, date: DateTime.now()),
@@ -84,6 +84,22 @@ class _MyHomePageState extends State<MyHomePage> {
   ];
 
   bool _showChart = false;
+
+  @override
+  void initState(){
+    WidgetsBinding.instance.addObserver(this);
+    super.initState();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state){
+    print(state);
+  }
+  @override
+  dispose(){
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   List<Transaction> get _recentTransactions {
     return _userTransactions.where((tx) {
@@ -123,13 +139,24 @@ class _MyHomePageState extends State<MyHomePage> {
         });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-    final isLandscape = mediaQuery.orientation == Orientation.landscape;
+  Widget _buildAndroidAppBar(){
+    return AppBar(
+            title: Text(
+              'Personal Expenses',
+              style: TextStyle(fontFamily: 'Open Sans'),
+            ),
+            actions: <Widget>[
+              IconButton(
+                  onPressed: () {
+                    _startAddNewTransaction(context);
+                  },
+                  icon: Icon(Icons.add))
+            ],
+          );
+  }
 
-    final PreferredSizeWidget appBar = Platform.isIOS
-        ? CupertinoNavigationBar(
+  Widget _buildIOSAppBar(){
+    return CupertinoNavigationBar(
             middle: Text(
               'Personal Expenses',
               style: TextStyle(fontFamily: 'Open Sans'),
@@ -145,20 +172,48 @@ class _MyHomePageState extends State<MyHomePage> {
                 )
               ],
             ),
-          )
-        : AppBar(
-            title: Text(
-              'Personal Expenses',
-              style: TextStyle(fontFamily: 'Open Sans'),
-            ),
-            actions: <Widget>[
-              IconButton(
-                  onPressed: () {
-                    _startAddNewTransaction(context);
-                  },
-                  icon: Icon(Icons.add))
-            ],
           );
+  }
+
+  List<Widget> _buildLandscapeContent(MediaQueryData mediaQuery, PreferredSizeWidget appBar, Widget txListWidget) {
+    return [Row(mainAxisAlignment: MainAxisAlignment.center, children: <Widget>[
+      Text('Show Chart', style: Theme.of(context).textTheme.title),
+      Switch.adaptive(
+        activeColor: Theme.of(context).accentColor,
+        value: _showChart,
+        onChanged: (val) {
+          setState(() {
+            _showChart = val;
+          });
+        },
+      ),
+    ]),  _showChart
+                  ? Container(
+                      height: (mediaQuery.size.height -
+                              appBar.preferredSize.height -
+                              mediaQuery.padding.top) *
+                          0.7,
+                      child: Chart(_recentTransactions))
+                  : txListWidget];
+  }
+
+  List<Widget> _buildPortraitContent(MediaQueryData mediaQuery, PreferredSizeWidget appBar, Widget txListWidget) {
+    return [Container(
+        height: (mediaQuery.size.height -
+                appBar.preferredSize.height -
+                mediaQuery.padding.top) *
+            0.25,
+        child: Chart(_recentTransactions)), txListWidget];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final isLandscape = mediaQuery.orientation == Orientation.landscape;
+
+    final PreferredSizeWidget appBar = Platform.isIOS
+        ? _buildIOSAppBar()
+        : _buildAndroidAppBar();
 
     final txListWidget = Container(
         height: (mediaQuery.size.height -
@@ -167,45 +222,16 @@ class _MyHomePageState extends State<MyHomePage> {
             0.75,
         child: TransactionList(_userTransactions, _deleteTransaction));
 
-    final pageBody = SafeArea(child: SingleChildScrollView(
+    final pageBody = SafeArea(
+        child: SingleChildScrollView(
       child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              if (isLandscape)
-                Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      Text('Show Chart', style: Theme.of(context).textTheme.title),
-                      Switch.adaptive(
-                        activeColor: Theme.of(context).accentColor,
-                        value: _showChart,
-                        onChanged: (val) {
-                          setState(() {
-                            _showChart = val;
-                          });
-                        },
-                      ),
-                    ]),
-              if (!isLandscape)
-                Container(
-                    height: (mediaQuery.size.height -
-                            appBar.preferredSize.height -
-                            mediaQuery.padding.top) *
-                        0.25,
-                    child: Chart(_recentTransactions)),
-              if (!isLandscape) txListWidget,
-              if (isLandscape)
-                _showChart
-                    ? Container(
-                        height: (mediaQuery.size.height -
-                                appBar.preferredSize.height -
-                                mediaQuery.padding.top) *
-                            0.7,
-                        child: Chart(_recentTransactions))
-                    : txListWidget,
-            ])
-      ,
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            if (isLandscape) ..._buildLandscapeContent(mediaQuery, appBar,txListWidget),
+            if (!isLandscape) ..._buildPortraitContent(mediaQuery, appBar,txListWidget),
+            
+          ]),
     ));
 
     return Platform.isIOS
